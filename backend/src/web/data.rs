@@ -8,51 +8,46 @@ pub fn routes(mc: Arc<ModelController>) -> Router {
 
 /// Routes for notes
 mod notes {
-    use crate::model::{table, ModelController, TableFilter};
-    use axum::{extract::State, 
-        http::StatusCode, 
-        response::IntoResponse, 
-        routing, 
-        Json, 
-        Router,
-        Path,
-    };
-    use once_cell::sync::Lazy;
-    use log::{info, warn};
-    use std::{sync::Arc, collections::HashSet};
+    use crate::model::{ModelController, Note};
+    use axum::{extract::Path, extract::State, http::StatusCode, routing, Json, Router};
+    use log::info;
+    use sqlx::FromRow;
+    use std::sync::Arc;
 
     pub fn route(mc: Arc<ModelController>) -> Router {
         Router::new()
-            .route("/get", routing::get(get))
+            .route("/get/:title", routing::get(get))
             .with_state(mc)
     }
-
-    //Legal fields 
-    static LEGAL_FIELDS: Lazy<Arc<HashSet<String>>> = Lazy::new(|| {
-        Arc::new(HashSet::from([
-            "title".to_string(),
-            "author".to_string(), 
-            "source".to_string(),
-        ]))
-    });
-
 
     async fn get(
         State(mc): State<Arc<ModelController>>,
         Path(title): Path<String>,
-    ) -> impl IntoResponse {
+    ) -> Result<Json<Note>, StatusCode> {
         info!("{:<12} -> notes::get", "ROUTE");
+        let mut conn = mc
+            .pool()
+            .acquire()
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-        match mc.get::<table::Notes>(&filter, &LEGAL_FIELDS).await {
-            Ok(v) => Ok(Json(v)),
-            Err(value) => {
-                warn!(
-                    "User attempted to access note table improperly, resulting in the following error:
-                    {}", 
-                    value.to_string()
-                );
-                Err(StatusCode::INTERNAL_SERVER_ERROR)
-            }
-        }
+        let note = sqlx::query(
+            "
+            SELECT 
+                title, author, source, pub_date 
+            FROM 
+                notes
+            WHERE 
+                title = ? COLLATE NOCASE
+        ",
+        )
+        .bind(title)
+        .fetch_one(&mut conn)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+        return Ok(Json(
+            Note::from_row(&note).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
+        ));
     }
 }

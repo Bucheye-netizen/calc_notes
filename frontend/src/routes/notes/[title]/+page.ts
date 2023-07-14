@@ -1,5 +1,5 @@
 import type { PageLoad } from './$types';
-
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 
 class Note {
     title: string;
@@ -11,26 +11,16 @@ class Note {
 export const load = (async ({ params }) => {
     console.log("Searching for note " + params.title);
     const response = await fetch(
-        "http://localhost:3000",
+        BACKEND_URL + "/api/data/notes/get/" + params.title,
         {
             method: "GET",
-            mode: "same-origin", 
-            cache: "default", 
-            credentials: "same-origin",
-            redirect: "error",
-            body: JSON.stringify(
-                {
-                    "table": "notes",
-                    "conds": 
-                        [
-                            [["title", "=", params.title], ""],
-                        ],
-                } 
-            ),
+            mode: 'cors'
         }
     );
-    let out: Note = await response.json();
 
-    return out;
-    
+    if (!response.ok) { 
+        throw response.status
+    }
+
+    return await response.json();
 }) satisfies PageLoad;

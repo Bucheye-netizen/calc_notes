@@ -6,7 +6,7 @@ use reqwest::{
     Response,
 };
 use serde_json::json;
-use std::{sync::Arc};
+use std::sync::Arc;
 
 async fn fmt_response(response: Response) -> String {
     let mut output: String = String::new();
@@ -81,23 +81,10 @@ async fn get_note_test() -> Result<()> {
         .cookie_store(true)
         .cookie_provider(cookie_jar().clone())
         .build()?;
-    let url= "http://localhost:3000";
+    let url = "http://localhost:3000";
 
     let response = client
-        .get(format!("{}/api/data/notes/get", url))
-        .json(&json!(
-            {
-                "table": "Notes",
-                "conds": 
-                    [
-                        [[
-                            "author",
-                             "=",
-                            "Lisan Kontra"
-                        ], ""],
-                    ],
-            } 
-        ))
+        .get(format!("{}/api/data/notes/get/Limits", url))
         .send()
         .await?;
 
