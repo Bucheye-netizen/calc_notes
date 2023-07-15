@@ -4,6 +4,12 @@
 /frontend/build
 /frontend/.svelte-kit
 /frontend/package
+/admin/node_modules
+/admin/build
+/admin/.svelte-kit
+/admin/package
+
+
 .env
 .db
 .env.*

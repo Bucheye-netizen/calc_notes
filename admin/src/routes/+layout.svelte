@@ -1,14 +1,14 @@
-<slot />
+<slot /> 
 
 <style>
     :global(body) {
         background-color: #FFF1E5;
-        font-family: "Vollkorn";
+        font-family: "Lato", sans-serif;
         font-size: 23px;
         color: #363636;
         max-width: 700px;
         line-height: 1.5;
-        padding-left: 24px;
+        padding-left: 18px;
         padding-right: 24px;
         margin-top: 0px;
         margin-right: auto;
@@ -17,9 +17,10 @@
         word-break: break-all
     }
     :global(h1) {
-        font-family: 'Lato';
+        font-family: 'Courier Prime', monospace;
         text-align: center;
         font-weight: 300;
+        font-size: 35px;
         line-height: 1;
     }
     :global(h2) {
@@ -35,5 +36,9 @@
     :global(div.sub-info) {
         font-family: 'Courier Prime';
         font-size: 16px;
+    }
+
+    :global(hr) {
+        border: 1px solid #9c938c;
     }
 </style> 

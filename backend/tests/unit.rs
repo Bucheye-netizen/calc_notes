@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use axum::http::{HeaderName, HeaderValue};
 use lazy_static::lazy_static;
 use reqwest::{
@@ -74,21 +74,61 @@ fn cookie_jar() -> Arc<Jar> {
     return COOKIE_JAR.clone();
 }
 
+const DEV_URL: &str = "http://localhost:3000";
+
 /// Tests whether the database can get notes
 #[tokio::test]
-async fn get_note_test() -> Result<()> {
+async fn data_test() -> Result<()> {
     let client = reqwest::Client::builder()
         .cookie_store(true)
         .cookie_provider(cookie_jar().clone())
         .build()?;
-    let url = "http://localhost:3000";
 
     let response = client
-        .get(format!("{}/api/data/notes/get/Limits", url))
+        .get(format!("{}/api/data/notes/get/Limits", DEV_URL))
         .send()
         .await?;
 
+    if !response.status().is_success() {
+        return Err(anyhow!(fmt_response(response).await));
+    }
+    
     println!("{}", fmt_response(response).await);
 
     Ok(())
+}
+
+#[tokio::test]
+async fn auth_test() -> Result<()> {
+    let client = reqwest::Client::builder()
+        .cookie_store(true)
+        .cookie_provider(cookie_jar().clone())
+        .build()?; 
+
+    let response = client
+        .post(format!("{}/api/auth/login", DEV_URL))
+        .json(&json!(
+            ["Test", "2444"]
+        ))
+        .send()
+        .await?;
+ 
+    if !response.status().is_success() {
+        return Err(anyhow!(fmt_response(response).await));
+    }
+       
+    println!("{}", fmt_response(response).await);
+
+    let response = client
+        .get(format!("{}/api/auth/logout", DEV_URL))
+        .send()
+        .await?;
+
+    if !response.status().is_success() {
+        return Err(anyhow!(fmt_response(response).await));
+    }
+
+    println!("{}", fmt_response(response).await);
+    
+    return Ok(());
 }

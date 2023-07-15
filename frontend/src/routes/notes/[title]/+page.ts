@@ -1,5 +1,6 @@
 import type { PageLoad } from './$types';
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
+import { PUBLIC_BACKEND_URL} from '$env/static/public'
+
 
 class Note {
     title: string;
@@ -8,10 +9,10 @@ class Note {
     dependencies: string[] = []; 
 }
 
-export const load = (async ({ params }) => {
+export const load = (async ({ params }) : Promise<Note> => {
     console.log("Searching for note " + params.title);
     const response = await fetch(
-        BACKEND_URL + "/api/data/notes/get/" + params.title,
+        PUBLIC_BACKEND_URL + "/api/data/notes/get/" + params.title,
         {
             method: "GET",
             mode: 'cors'

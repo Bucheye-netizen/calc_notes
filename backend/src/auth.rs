@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::model::ModelController;
 use anyhow::{anyhow, Result};
-use axum::{extract::State, Json, Router};
+use axum::{extract::State, Json, Router, routing, http::StatusCode};
 use axum_login::{
     extractors::AuthContext, memory_store::MemoryStore as AuthMemoryStore, secrecy::SecretVec,
     AuthUser,
@@ -52,7 +52,7 @@ impl User {
     /// Creates a new user, salting and hashing their password
     /// and adds them to the databse.
     pub async fn new(
-        mc: ModelController,
+        mc: &ModelController,
         name: String,
         password: String,
         role: Role,
@@ -61,12 +61,7 @@ impl User {
         let parsed_hash = Pbkdf2
             .hash_password(password.as_bytes(), &salt)
             .map_err(|_| anyhow!("Authentication hashing failed"))?;
-
-        // Verifies that hashing succeeded
-        assert!(Pbkdf2
-            .verify_password(password.as_bytes(), &parsed_hash)
-            .is_ok());
-
+        
         let mut conn = mc.pool().acquire().await?;
         let res = sqlx::query(
             "
@@ -149,24 +144,32 @@ impl AuthUser<i64, Role> for User {
 
 type Auth = AuthContext<i64, User, AuthMemoryStore<i64, User>, Role>;
 
-fn route(mc: Arc<ModelController>) -> Router {
-    return Router::new().with_state(mc);
+pub fn routes(mc: Arc<ModelController>) -> Router {
+    return Router::new()
+        .route("/login", routing::post(login))
+        .route("/logout", routing::get(logout))
+        .with_state(mc);
 }
 
 async fn login(
     mut auth: Auth,
-    State(mc): State<ModelController>,
+    State(mc): State<Arc<ModelController>>,
     Json((name, password)): Json<(String, String)>,
-) -> Result<()> {
+) -> Result<(), StatusCode> {
     info!("{:<12} -> auth::login", "ROUTE");
 
     auth.login(
         &User::query(&mc, &name, &password)
             .await
-            .map_err(|_| anyhow!("User login failed"))?,
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
     )
     .await
-    .map_err(|_| anyhow!("User login failed"))?;
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     Ok(())
+}
+
+async fn logout(mut auth: Auth) {
+    info!("{:<12} -> auth::logout", "ROUTE");
+    auth.logout().await;
 }

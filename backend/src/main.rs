@@ -43,15 +43,24 @@ async fn main() -> Result<()> {
     let mc = Arc::new(ModelController::new().await?);
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
 
-    let cors = CorsLayer::new().allow_origin(
-        env::var("FRONTEND_URL")
-            .expect("Set FRONTEND_URl environment variable")
-            .parse::<HeaderValue>()
-            .unwrap(),
-    );
+    let cors = CorsLayer::new()
+        .allow_origin(
+            env::var("FRONTEND_URL")
+                .expect("Set FRONTEND_URl environment variable")
+                .parse::<HeaderValue>()
+                .unwrap(),
+        )
+        .allow_origin(
+            env::var("ADMIN_URL")
+                .expect("Set ADMIN_URl environment variable")
+                .parse::<HeaderValue>()
+                .unwrap(),
+        )
+        .allow_credentials(true);
 
     let route = Router::new()
         .nest("/api/data", web::data::routes(mc.clone()))
+        .nest("/api/auth", auth::routes(mc.clone()))
         .layer(auth_layer)
         .layer(session_layer)
         .layer(cors);
