@@ -5,7 +5,7 @@ use anyhow::{anyhow, Result};
 use axum::{extract::State, Json, Router, routing, http::StatusCode};
 use axum_login::{
     extractors::AuthContext, memory_store::MemoryStore as AuthMemoryStore, secrecy::SecretVec,
-    AuthUser,
+    AuthUser
 };
 use log::info;
 use password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString};
@@ -88,12 +88,14 @@ impl User {
     /// Query user information based on the given password and username.
     pub async fn query(mc: &ModelController, name: &String, password: &String) -> Result<Self> {
         let mut conn = mc.pool().acquire().await?;
-
         // Getting user from database
         let user = User::from_row(
             &sqlx::query(
                 "
-                SELECT * FROM users
+                SELECT 
+                    * 
+                FROM 
+                    users
                 WHERE 
                     name = ?
             ",
@@ -148,6 +150,7 @@ pub fn routes(mc: Arc<ModelController>) -> Router {
     return Router::new()
         .route("/login", routing::post(login))
         .route("/logout", routing::get(logout))
+        .route("/status", routing::get(status))
         .with_state(mc);
 }
 
@@ -157,19 +160,34 @@ async fn login(
     Json((name, password)): Json<(String, String)>,
 ) -> Result<(), StatusCode> {
     info!("{:<12} -> auth::login", "ROUTE");
-
     auth.login(
         &User::query(&mc, &name, &password)
             .await
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
-    )
-    .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+            .map_err(|x| { 
+                info!("ROUTE auth::login: {}", x);
+                StatusCode::INTERNAL_SERVER_ERROR
+            })?
+        )
+        .await
+        .map_err(|x| {
+            info!("ROUTE auth::login: {}", x);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
 
-    Ok(())
+    return Ok(());
 }
 
 async fn logout(mut auth: Auth) {
     info!("{:<12} -> auth::logout", "ROUTE");
     auth.logout().await;
+}
+
+
+async fn status(auth: Auth) -> Json<u32> {
+    info!("{:<12} -> auth::status", "ROUTE");
+
+    return Json(match auth.current_user {
+        None => u32::MAX,
+        Some(user) => user.role.as_u32()
+    });
 }

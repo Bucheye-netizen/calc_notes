@@ -120,6 +120,17 @@ async fn auth_test() -> Result<()> {
     println!("{}", fmt_response(response).await);
 
     let response = client
+        .get(format!("{}/api/auth/status", DEV_URL))
+        .send()
+        .await?;
+
+    if !response.status().is_success() {
+        return Err(anyhow!(fmt_response(response).await));
+    }
+
+    println!("{}", fmt_response(response).await);
+
+    let response = client
         .get(format!("{}/api/auth/logout", DEV_URL))
         .send()
         .await?;

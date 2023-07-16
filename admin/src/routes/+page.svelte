@@ -4,10 +4,4 @@
     abcdefghijklmnopqrstuvwxyz
     abcdefghijklmnopqrstuvwxyz
     abcdefghijklmnopqrstuvwxyz
-    abcdefghijklmnopqrstuvwxyz
-    abcdefghijklmnopqrstuvwxyz
-    abcdefghijklmnopqrstuvwxyz
-    abcdefghijklmnopqrstuvwxyz
-    abcdefghijklmnopqrstuvwxyz
-    abcdefghijklmnopqrstuvwxyz
 </p>

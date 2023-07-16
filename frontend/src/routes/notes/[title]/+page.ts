@@ -10,7 +10,6 @@ class Note {
 }
 
 export const load = (async ({ params }) : Promise<Note> => {
-    console.log("Searching for note " + params.title);
     const response = await fetch(
         PUBLIC_BACKEND_URL + "/api/data/notes/get/" + params.title,
         {

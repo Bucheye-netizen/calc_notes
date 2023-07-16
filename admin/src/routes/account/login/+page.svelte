@@ -1,13 +1,11 @@
 <script>
-    import { PUBLIC_BACKEND_URL} from '$env/static/public'
-    console.log("Backend url " + PUBLIC_BACKEND_URL);
-    let password;
-    let promise;
-    let name; 
+	import { goto } from '$app/navigation';
+    import { PUBLIC_BACKEND_URL } from '$env/static/public';
+    import { BarLoader } from 'svelte-loading-spinners';
 
-    async function login() {
+    async function login(name, password) {
         try {
-            await fetch(
+            const res = await fetch(
                 PUBLIC_BACKEND_URL + "/api/auth/login", 
                 {
                     method: "POST",
@@ -17,36 +15,77 @@
                         "Content-Type": "application/json",
                     },
                     body: JSON.stringify([name, password])
-                    
                 }
-            );
+            ); 
+        
+            if (!res.ok) { return false; }
         } catch (e) {
-            console.log(e);
+            return false;
         }
+        goto("/");
     }
 
-    function handleClick() {
-        promise = login();
-    }
+    let valid; 
+    let name;
+    let password;
 
+    function on_submit() {
+        valid = login(name, password);
+    }
 </script>
 
 <h1> Login page </h1> 
 
-<form>
+<form on:submit={on_submit} >
     <label>
-       name 
-        <input name="name" type="name" bind:value={name}>
+       NAME
+        <input bind:value={name} type="text" required>
     </label>
+    <br>
     <label>
-        Password
-        <input name="password" type="password" bind:value={password}>
+        PASSWORD
+        <input bind:value={password} type="text" required>
     </label>
-    <button on:click={handleClick}>Log in</button>
+    <br>
+    <div class="button"><button on:click={on_submit}>LOGIN</button></div>
+
+    {#await valid} 
+        <div class="loader">
+            <BarLoader size="60" color="darkred" unit="px" duration="2s" />
+        </div>
+    {:then value}
+        {#if value == false}
+            <p>Failed to login</p>
+        {/if}
+    {/await}
 </form>
 
-{#await promise}
-    <p>Logging in...</p>
-{:then response}
-    <p>{response}</p>
-{/await}
+<style lang="scss">
+    .button {
+        text-align: center;
+    }
+
+    .loader {
+        margin-top: 30px;
+        justify-content: center;
+        display: flex;
+    }
+
+    button {
+        border-top: 0;
+    }
+
+    form {
+        max-width: 300px;
+        margin: auto;
+    }
+    label {
+        width: 100%;
+        margin: 10px;
+        display:inline-block;
+    }
+    input {
+        width: 100%;
+        display:inline-block;
+    }
+</style>
