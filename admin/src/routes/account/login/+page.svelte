@@ -40,12 +40,12 @@
 <form on:submit={on_submit} >
     <label>
        NAME
-        <input bind:value={name} type="text" required>
+        <input bind:value={name} type="text" placeholder="..." required>
     </label>
     <br>
     <label>
         PASSWORD
-        <input bind:value={password} type="text" required>
+        <input bind:value={password} type="text" placeholder="..." required>
     </label>
     <br>
     <div class="button"><button>LOGIN</button></div>

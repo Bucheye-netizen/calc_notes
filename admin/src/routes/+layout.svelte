@@ -29,7 +29,7 @@
     :global(h2) {
         font-family: consts.$mono;
         font-weight: normal;
-        font-size: 32px;
+        font-size: 30px;
         padding-left: 20px;
     }
     :global(h3) {
@@ -86,5 +86,12 @@
         font-family: consts.$mono;
         text-align: center;
         font-weight: normal;
+    }
+
+    :global(textarea) {
+        @include themes.light;
+        font-family: consts.$mono;
+        border-width: 2px;
+        font-size: 15px;
     }
 </style> 

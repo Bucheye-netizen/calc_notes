@@ -5,8 +5,11 @@
     export let data: PageData;
 
     function edit(title: string) {
+        goto("/edit/notes/" + title);
     }
 </script>
+
+<!-- Todo: Increase indentation -->
 
 <h1>Admin dashboard</h1>
 <hr class="solid">
@@ -20,18 +23,18 @@
   </tr>
   {#each data.values as note}
     <tr>
-        <button on:click={() => edit(note.title)}>Edit</button>
-        <td>{note.title}</td>
-        <td>{note.author}</td>
-        <td>{note.pub_date}</td>
+      <button on:click={() => edit(note.title)}>Edit</button>
+      <td>{note.title}</td>
+      <td>{note.author}</td>
+      <td>{note.pub_date}</td>
     </tr>   
   {/each}
 </table>
 
 <style>
-    button {
-        margin-left: 10px;
-        border: none; 
-        color: maroon;
-    }
+  button {
+    margin-left: 10px;
+    border: none; 
+    color: maroon;
+  }
 </style>
