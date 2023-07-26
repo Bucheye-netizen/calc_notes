@@ -1,11 +1,13 @@
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use axum::http::{HeaderName, HeaderValue};
 use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use reqwest::{
     cookie::{Cookie, CookieStore, Jar},
     Response,
 };
 use serde_json::json;
+use std::env;
 use std::sync::Arc;
 
 async fn fmt_response(response: Response) -> String {
@@ -74,53 +76,44 @@ fn cookie_jar() -> Arc<Jar> {
     return COOKIE_JAR.clone();
 }
 
-const DEV_URL: &str = "http://localhost:3000";
+// const DEV_URL: &str = "http://api.calcnotes.com";
+static BACKEND_URL: Lazy<String> = Lazy::new(|| {
+    dotenvy::dotenv().ok();
+    env::var("BACKEND_URL").expect("Set the BACKEND_URL environment variable")
+});
 
 /// Tests whether the database can get notes
 #[tokio::test]
-async fn data_test() -> Result<()> {
+async fn data() -> Result<()> {
     let client = reqwest::Client::builder()
         .cookie_store(true)
         .cookie_provider(cookie_jar().clone())
         .build()?;
 
     let response = client
-        .get(format!("{}/api/data/notes/get/Limits", DEV_URL))
+        .get(format!("{}/data/notes/get/Limits", BACKEND_URL.as_str()))
         .send()
         .await?;
 
     if !response.status().is_success() {
         return Err(anyhow!(fmt_response(response).await));
     }
-    
+
     println!("{}", fmt_response(response).await);
 
     Ok(())
 }
 
 #[tokio::test]
-async fn auth_test() -> Result<()> {
+async fn auth() -> Result<()> {
     let client = reqwest::Client::builder()
         .cookie_store(true)
         .cookie_provider(cookie_jar().clone())
-        .build()?; 
+        .build()?;
 
     let response = client
-        .post(format!("{}/api/auth/login", DEV_URL))
-        .json(&json!(
-            ["Test", "2444"]
-        ))
-        .send()
-        .await?;
- 
-    if !response.status().is_success() {
-        return Err(anyhow!(fmt_response(response).await));
-    }
-       
-    println!("{}", fmt_response(response).await);
-
-    let response = client
-        .get(format!("{}/api/auth/status", DEV_URL))
+        .post(format!("{}/auth/login", BACKEND_URL.as_str()))
+        .json(&json!(["Test", "2444"]))
         .send()
         .await?;
 
@@ -131,7 +124,7 @@ async fn auth_test() -> Result<()> {
     println!("{}", fmt_response(response).await);
 
     let response = client
-        .get(format!("{}/api/auth/logout", DEV_URL))
+        .get(format!("{}/auth/status", BACKEND_URL.as_str()))
         .send()
         .await?;
 
@@ -140,6 +133,17 @@ async fn auth_test() -> Result<()> {
     }
 
     println!("{}", fmt_response(response).await);
-    
+
+    let response = client
+        .get(format!("{}/auth/logout", BACKEND_URL.as_str()))
+        .send()
+        .await?;
+
+    if !response.status().is_success() {
+        return Err(anyhow!(fmt_response(response).await));
+    }
+
+    println!("{}", fmt_response(response).await);
+
     return Ok(());
 }

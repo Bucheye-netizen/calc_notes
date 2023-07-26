@@ -2,12 +2,9 @@ use std::sync::Arc;
 
 use crate::model::ModelController;
 use anyhow::{anyhow, Result};
-use axum::{extract::State, Json, Router, routing, http::StatusCode};
-use axum_login::{
-    extractors::AuthContext, memory_store::MemoryStore as AuthMemoryStore, secrecy::SecretVec,
-    AuthUser
-};
-use log::info;
+use axum::{extract::State, http::StatusCode, routing, Json, Router};
+use axum_login::{extractors::AuthContext, secrecy::SecretVec, AuthUser, SqliteStore};
+use log::{info, log_enabled, Level};
 use password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString};
 use pbkdf2::Pbkdf2;
 use rand_core::OsRng;
@@ -61,7 +58,7 @@ impl User {
         let parsed_hash = Pbkdf2
             .hash_password(password.as_bytes(), &salt)
             .map_err(|_| anyhow!("Authentication hashing failed"))?;
-        
+
         let mut conn = mc.pool().acquire().await?;
         let res = sqlx::query(
             "
@@ -144,7 +141,7 @@ impl AuthUser<i64, Role> for User {
     }
 }
 
-type Auth = AuthContext<i64, User, AuthMemoryStore<i64, User>, Role>;
+type Auth = AuthContext<i64, User, SqliteStore<User, Role>, Role>;
 
 pub fn routes(mc: Arc<ModelController>) -> Router {
     return Router::new()
@@ -160,34 +157,37 @@ async fn login(
     Json((name, password)): Json<(String, String)>,
 ) -> Result<(), StatusCode> {
     info!("{:<12} -> auth::login", "ROUTE");
-    auth.login(
-        &User::query(&mc, &name, &password)
-            .await
-            .map_err(|x| { 
-                info!("ROUTE auth::login: {}", x);
-                StatusCode::INTERNAL_SERVER_ERROR
-            })?
-        )
-        .await
-        .map_err(|x| {
-            info!("ROUTE auth::login: {}", x);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
+    auth.login(&User::query(&mc, &name, &password).await.map_err(|x| {
+        info!("ERROR auth::login: {}", x);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?)
+    .await
+    .map_err(|x| {
+        info!("ERROR auth::login: {}", x);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
     return Ok(());
 }
 
 async fn logout(mut auth: Auth) {
-    info!("{:<12} -> auth::logout", "ROUTE");
+    if log_enabled!(Level::Info) {
+        let string = match &auth.current_user {
+            Some(u) => &u.name,
+            None => "NONE",
+        };
+
+        info!("{:<12} -> auth::logout: {}", "ROUTE", string);
+    }
+
     auth.logout().await;
 }
-
 
 async fn status(auth: Auth) -> Json<u32> {
     info!("{:<12} -> auth::status", "ROUTE");
 
     return Json(match auth.current_user {
         None => u32::MAX,
-        Some(user) => user.role.as_u32()
+        Some(user) => user.role.as_u32(),
     });
 }

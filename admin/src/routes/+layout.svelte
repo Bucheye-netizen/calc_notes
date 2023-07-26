@@ -3,7 +3,8 @@
 <style lang="scss"> 
     @use "../styles/themes";
     @use "../styles/consts";
-    
+    $color: #0cf;
+
     :global(body) {
         @include themes.light;
         font-family: consts.$sans;
@@ -26,11 +27,13 @@
         line-height: 1;
     }
     :global(h2) {
+        font-family: consts.$mono;
         font-weight: normal;
         font-size: 32px;
         padding-left: 20px;
     }
     :global(h3) {
+        font-family: consts.$mono;
         font-weight: normal;
         padding-left: 20px;
         font-size: 28px;
@@ -63,9 +66,25 @@
         box-shadow: none;
         border-bottom: 2px solid #9c938c;
         border-top: 2px solid #9c938c;
+        -webkit-transition: ease-out 0.4s;
+        -moz-transition: ease-out 0.4s;
+        transition: ease-out 0.4s;
     }
-
+    :global(button:hover) {
+        box-shadow: inset 0 0 0 50px #f5e8df;
+    }
     :global(label) {
         font-family: consts.$mono;
+    }
+    :global(table, th, td) {
+        @include themes.light;
+        border-bottom: 1px solid #9c938c;
+        border-collapse: collapse;
+        padding: 6px;
+    }
+    :global(th) {
+        font-family: consts.$mono;
+        text-align: center;
+        font-weight: normal;
     }
 </style> 

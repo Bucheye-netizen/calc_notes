@@ -4,6 +4,7 @@
 		"noImplicitAny": false, 
 		"allowJs": true,
 		"checkJs": true,
+		"strictPropertyInitialization": false,
 		"esModuleInterop": true,
 		"forceConsistentCasingInFileNames": true,
 		"resolveJsonModule": true,

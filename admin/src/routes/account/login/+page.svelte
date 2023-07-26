@@ -3,10 +3,10 @@
     import { PUBLIC_BACKEND_URL } from '$env/static/public';
     import { BarLoader } from 'svelte-loading-spinners';
 
-    async function login(name, password) {
+    async function login() {
         try {
             const res = await fetch(
-                PUBLIC_BACKEND_URL + "/api/auth/login", 
+                PUBLIC_BACKEND_URL + "/auth/login", 
                 {
                     method: "POST",
                     mode: "cors",
@@ -16,10 +16,11 @@
                     },
                     body: JSON.stringify([name, password])
                 }
-            ); 
-        
+            );
+
             if (!res.ok) { return false; }
         } catch (e) {
+            console.log(e);
             return false;
         }
         goto("/");
@@ -30,7 +31,7 @@
     let password;
 
     function on_submit() {
-        valid = login(name, password);
+        valid = login();
     }
 </script>
 
@@ -47,7 +48,7 @@
         <input bind:value={password} type="text" required>
     </label>
     <br>
-    <div class="button"><button on:click={on_submit}>LOGIN</button></div>
+    <div class="button"><button>LOGIN</button></div>
 
     {#await valid} 
         <div class="loader">

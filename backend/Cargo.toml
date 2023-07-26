@@ -10,16 +10,20 @@ env_logger = "0.10.0"
 log = "0.4.17"
 serde = { version = "1.0.163", features = ["serde_derive"] }
 serde_json = "1.0.96"
-reqwest = { version = "0.11.18", features = ["json", "cookies"] }
-lazy_static = "1.4.0"
 anyhow = "1.0.71"
 dotenvy = "0.15.7"
 sqlx = { version = "0.6.3", features = ["sqlite", "runtime-tokio-rustls"] }
 rustls = "0.21.1"
 tokio-stream = "0.1.14"
-once_cell = "1.18.0"
 tower-http = { version = "0.4.1", features = ["cors"] }
 axum-login = { version = "0.5.0", features = [ "sqlx", "sqlite"] }
 password-hash = "0.5.0"
 pbkdf2 = { version = "0.12", features = ["simple"] }
 rand_core = { version = "0.6", features = ["std"] }
+tower = { version = "0.4.13", features = ["tokio"] }
+axum-server = { version = "0.5.1", feautres = ["rustls"] }
+reqwest = { version = "0.11.18", features = ["json", "cookies"] }
+
+[dev-dependencies]
+once_cell = "1.18.0"
+lazy_static = "1.4.0"

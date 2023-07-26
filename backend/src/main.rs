@@ -1,14 +1,16 @@
 use axum::Router;
+use axum_login::axum_sessions::SameSite;
 use axum_login::AuthLayer;
 use axum_login::{
     axum_sessions::{async_session::MemoryStore as SessionMemoryStore, SessionLayer},
-    SqliteStore
+    SqliteStore,
 };
+use reqwest::header::{CONTENT_TYPE, SET_COOKIE};
+use std::env;
+use tower::ServiceBuilder;
 
 use log::info;
 use rand_core::{OsRng, RngCore};
-use reqwest::header::CONTENT_TYPE;
-use std::env;
 use std::{net::SocketAddr, sync::Arc};
 use tower_http::cors::CorsLayer;
 
@@ -18,12 +20,15 @@ pub mod web;
 #[allow(dead_code)]
 pub mod auth;
 
-use crate::auth::{User, Role};
+use crate::auth::{Role, User};
 use crate::model::ModelController;
 use anyhow::Result;
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    dotenvy::dotenv().ok();
+    env_logger::init();
+
     let mc = Arc::new(ModelController::new().await?);
 
     // let secret: [u8; 64] = rand::thread_rng().gen();
@@ -31,33 +36,39 @@ async fn main() -> Result<()> {
     OsRng::fill_bytes(&mut OsRng, &mut secret);
 
     let session_store = SessionMemoryStore::new();
-    let session_layer = SessionLayer::new(session_store, &secret);
-
-    let store: SqliteStore<User, Role> = SqliteStore::new(mc.pool().clone());
+    let session_layer = SessionLayer::new(session_store, &secret)
+        .with_secure(true)
+        .with_same_site_policy(SameSite::None);
+    let store: SqliteStore<User, Role> =
+        SqliteStore::new(mc.pool().clone()).with_query("SELECT * FROM users WHERE id = ?");
     let auth_layer = AuthLayer::new(store, &secret);
-
-    dotenvy::dotenv().ok();
-    env_logger::init();
-
-    let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
-
-    let cors = CorsLayer::new()
-        .allow_origin([
-            env::var("FRONTEND_URL").expect("Set FRONTEND_URl environment variable").parse().unwrap(),
-            env::var("ADMIN_URL").expect("Set FRONTEND_URl environment variable").parse().unwrap(),
-        ])
+    let cors_layer = CorsLayer::new()
         .allow_credentials(true)
-        .allow_headers([CONTENT_TYPE]);
+        .allow_origin([
+            env::var("ADMIN_URL")
+                .expect("Set FRONTEND_URL environment variable")
+                .parse()
+                .unwrap(),
+            env::var("FRONTEND_URL")
+                .expect("Set FRONTEND_URL environment variable")
+                .parse()
+                .unwrap(),
+        ])
+        .allow_headers([CONTENT_TYPE, SET_COOKIE]);
+    let addr = SocketAddr::from(([127, 0, 0, 1], 8000));
+    let layers = ServiceBuilder::new()
+        .layer(cors_layer)
+        .layer(session_layer)
+        .layer(auth_layer);
 
     let route = Router::new()
-        .nest("/api/data", web::data::routes(mc.clone()))
-        .nest("/api/auth", auth::routes(mc.clone()))
-        .layer(auth_layer)
-        .layer(session_layer)
-        .layer(cors);
+        .nest("/data", web::data::routes(mc.clone()))
+        .nest("/auth", auth::routes(mc.clone()))
+        .layer(layers);
 
     info!("Starting server at socket address {}", addr);
-    axum::Server::bind(&addr)
+    //TODO: Implement HTTPS with rustls
+    axum_server::bind(addr)
         .serve(route.into_make_service())
         .await
         .expect("Failed to start server");

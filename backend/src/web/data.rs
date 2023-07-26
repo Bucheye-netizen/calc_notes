@@ -17,6 +17,7 @@ mod notes {
     pub fn route(mc: Arc<ModelController>) -> Router {
         Router::new()
             .route("/get/:title", routing::get(get))
+            .route("/get", routing::get(all))
             .with_state(mc)
     }
 
@@ -48,6 +49,35 @@ mod notes {
 
         return Ok(Json(
             Note::from_row(&note).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
+        ));
+    }
+
+    async fn all(State(mc): State<Arc<ModelController>>) -> Result<Json<Vec<Note>>, StatusCode> {
+        info!("{:<12} -> notes::all", "ROUTE");
+
+        let mut conn = mc
+            .pool()
+            .acquire()
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+        let notes = sqlx::query(
+            "
+            SELECT 
+                title, author, source, pub_date 
+            FROM 
+                notes
+        ",
+        )
+        .fetch_all(&mut conn)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+        return Ok(Json(
+            notes
+                .iter()
+                .map(|r| Note::from_row(r).expect("Failed to map note from row"))
+                .collect::<Vec<Note>>(),
         ));
     }
 }
