@@ -6,6 +6,7 @@ use reqwest::{
     cookie::{Cookie, CookieStore, Jar},
     Response,
 };
+use reqwest::Client;
 use serde_json::json;
 use std::env;
 use std::sync::Arc;
@@ -76,16 +77,28 @@ fn cookie_jar() -> Arc<Jar> {
     return COOKIE_JAR.clone();
 }
 
-// const DEV_URL: &str = "http://api.calcnotes.com";
 static BACKEND_URL: Lazy<String> = Lazy::new(|| {
     dotenvy::dotenv().ok();
     env::var("BACKEND_URL").expect("Set the BACKEND_URL environment variable")
 });
 
+/// An admin user for test purposes
+static TEST_ADMIN: Lazy<(String, String)> = Lazy::new(|| {
+    dotenvy::dotenv().ok();
+    (
+        env::var("TEST_ADMIN")
+            .expect("Set the BACKEND_URL environment variable"),
+        env::var("TEST_ADMIN_PASSWORD")
+            .expect("Set TEST_ADMIN_PASSWORD the environment variable")
+    )
+});
+
+
+
 /// Tests whether the database can get notes
 #[tokio::test]
 async fn data() -> Result<()> {
-    let client = reqwest::Client::builder()
+    let client = Client::builder()
         .cookie_store(true)
         .cookie_provider(cookie_jar().clone())
         .build()?;
@@ -106,14 +119,14 @@ async fn data() -> Result<()> {
 
 #[tokio::test]
 async fn auth() -> Result<()> {
-    let client = reqwest::Client::builder()
+    let client = Client::builder()
         .cookie_store(true)
         .cookie_provider(cookie_jar().clone())
         .build()?;
 
     let response = client
         .post(format!("{}/auth/login", BACKEND_URL.as_str()))
-        .json(&json!(["Test", "2444"]))
+        .json(&json!([TEST_ADMIN.0, TEST_ADMIN.1]))
         .send()
         .await?;
 
@@ -144,6 +157,86 @@ async fn auth() -> Result<()> {
     }
 
     println!("{}", fmt_response(response).await);
+
+    return Ok(());
+}
+
+
+/// Checks whether updating works. 
+/// TODO: Add check to ensure update occurred, not just that it didn't error.
+#[tokio::test]
+async fn update() -> Result<()> {
+    let client = Client::builder()
+        .cookie_store(true)
+        .cookie_provider(cookie_jar().clone())
+        .build()?;
+
+    client
+        .post(format!("{}/auth/login", BACKEND_URL.as_str()))
+        .json(&json!([TEST_ADMIN.0, TEST_ADMIN.1]))
+        .send()
+        .await?;
+
+    let response = client
+        .patch(format!("{}/data/notes/update", BACKEND_URL.as_str()))
+        .json(&json!(
+            {
+                "set": 
+                {
+                    "source": "Updated body",
+                    "pub_date": -2000
+                }, 
+                "at": 
+                [
+                    [["title", "=", "Test"], ""]
+                ]
+            }
+        ))
+        .send()
+        .await?;
+
+    if !response.status().is_success() {
+        return Err(anyhow!(fmt_response(response).await));
+    }
+
+    println!("{}", fmt_response(response).await);
+ 
+
+    let response = client
+        .patch(format!("{}/data/notes/update", BACKEND_URL.as_str()))
+        .json(&json!(
+            {
+                "set": 
+                {
+                    "source": "<h1>Usage</h1> <p>This is almost entirely for testing purposes</p>",
+                    "pub_date": 0
+                }, 
+                "at": 
+                [
+                    [["title", "=", "Test"], ""]
+                ]
+            }
+        ))
+        .send()
+        .await?;
+
+    /*
+        [
+            [[ "author", "=", "Lisan Kontra"], ""]
+        ],
+    */
+
+    if !response.status().is_success() {
+        return Err(anyhow!(fmt_response(response).await));
+    }
+
+    println!("{}", fmt_response(response).await);
+ 
+    client
+        .get(format!("{}/auth/logout", BACKEND_URL.as_str()))
+        .json(&json!([TEST_ADMIN.0, TEST_ADMIN.1]))
+        .send()
+        .await?;
 
     return Ok(());
 }

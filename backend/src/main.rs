@@ -14,6 +14,7 @@ use rand_core::{OsRng, RngCore};
 use std::{net::SocketAddr, sync::Arc};
 use tower_http::cors::CorsLayer;
 
+#[allow(unused)]
 pub mod model;
 pub mod web;
 
@@ -28,7 +29,6 @@ use anyhow::Result;
 async fn main() -> Result<()> {
     dotenvy::dotenv().ok();
     env_logger::init();
-
     let mc = Arc::new(ModelController::new().await?);
 
     // let secret: [u8; 64] = rand::thread_rng().gen();
@@ -40,7 +40,7 @@ async fn main() -> Result<()> {
         .with_secure(true)
         .with_same_site_policy(SameSite::None);
     let store: SqliteStore<User, Role> =
-        SqliteStore::new(mc.pool().clone()).with_query("SELECT * FROM users WHERE id = ?");
+        SqliteStore::new(mc.pool().clone()).with_query("SELECT * FROM UserTable WHERE id = ?");
     let auth_layer = AuthLayer::new(store, &secret);
     let cors_layer = CorsLayer::new()
         .allow_credentials(true)

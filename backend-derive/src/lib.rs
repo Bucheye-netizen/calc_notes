@@ -20,19 +20,20 @@ pub fn table(input: TokenStream) -> TokenStream {
 
 fn impl_table(ast: &syn::DeriveInput) -> quote::Tokens {
     let struct_name = &ast.ident;
-    let scaffold_name = Ident::new(format!("_{}_SCAFFOLD", struct_name.to_string().to_ascii_uppercase()));
+    let global_name = Ident::new(format!("_{}_FIELDS", struct_name.to_string().to_ascii_uppercase()));
+    let table_name = format!("{}Table", struct_name);
 
     if let syn::Body::Struct(body) = &ast.body {
         let fields = body.fields();
-        let mut scaffold_fields: Vec<String> = Vec::new();
-        scaffold_fields.reserve(fields.len());
-        let mut field_str_names: Vec<String> = Vec::new();
-        field_str_names.reserve(fields.len());
+        let mut field_types: Vec<Ident> = Vec::new();
+        field_types.reserve(fields.len());
         let mut field_names: Vec<String> = Vec::new();
         field_names.reserve(fields.len());
 
         for field in fields {
             let sqlite_type = {
+                // Slightly inefficient since I'm unnecessarily allocating 
+                // a new field_type string. 
                 let field_type = match &field.ty {
                     Ty::Path(_, path) => path
                         .segments
@@ -44,50 +45,39 @@ fn impl_table(ast: &syn::DeriveInput) -> quote::Tokens {
                 };
             
                 match field_type[0].as_str() {
-                    "u64" => "SqliteType::Integer",
-                    "i64" => "SqliteType::Integer",
-                    "f64" => "SqliteType::Real",
-                    "String" => "SqliteType::Text",
+                    "u64" => Ident::new("crate::model::SqliteType::Integer"),
+                    "i64" => Ident::new("crate::model::SqliteType::Integer"),
+                    "f64" => Ident::new("crate::model::SqliteType::Real"),
+                    "String" => Ident::new("crate::model::SqliteType::Text"),
                     _ => panic!("Invalid field type")
                 }
 
             };
 
-            let ident = field.ident.as_ref().unwrap().to_string();
-
-            scaffold_fields.push(format!("(\"{}\", {})", ident, sqlite_type));
-            field_str_names.push(format!("\"{}\"", ident));
-            field_names.push(format!("{}", ident));
+            field_types.push(sqlite_type);
+            let ident = field.ident.as_ref().unwrap();
+            field_names.push(ident.to_string());
         }
 
         quote! {
                 /// Not intended for direct use. See [Table] trait.
-                static #scaffold_name: once_cell::sync::Lazy<std::sync::Arc<std::collections::HashMap<String, SqliteType>>> = Lazy::new(|| {
+                static #global_name: once_cell::sync::Lazy<std::sync::Arc<std::collections::HashMap<String, SqliteType>>> = Lazy::new(|| {
                     let map: std::collections::HashMap<String, SqliteType> = [
-                        #(#scaffold_fields),*
-                    ];
+                        #((#field_names.to_string(), #field_types)),*
+                    ]
+                    .into_iter()
+                    .collect::<std::collections::HashMap<String, SqliteType>>();
 
                     std::sync::Arc::new(map)
                 });
                 
                 impl Table for #struct_name {
-                    fn scaffold<T>() -> std::sync::Arc<std::collections::HashMap<String, SqliteType>> {
-                        #scaffold_name.clone()
+                    fn fields() -> std::sync::Arc<std::collections::HashMap<String, SqliteType>> {
+                        #global_name.clone()
                     }
-
-                    fn get<T>(&self, col: &str) -> anyhow::Result<&T> {
-                        let out: Box<dyn std::any::Any>;
-
-                        #(
-                            if col == #field_str_names {
-                                out = Box::new(&self.#field_names);
-                                return out
-                                    .downcast_ref::<T>()
-                                    .ok_or(anyhow::anyhow!("Invalid type!"));
-                            }
-                        )*
-
-                        return anyhow::Result::Err(anyhow::anyhow!("No such column!"));
+                
+                    fn name() -> &'static str {
+                        return #table_name;
                     }
                 }
             }

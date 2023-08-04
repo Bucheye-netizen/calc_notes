@@ -8,14 +8,16 @@ pub fn routes(mc: Arc<ModelController>) -> Router {
 
 /// Routes for notes
 mod notes {
-    use crate::model::{ModelController, Note};
+    use crate::{model::{ModelController, Note, Updater}, auth::{RequireAuth, Role}};
     use axum::{extract::Path, extract::State, http::StatusCode, routing, Json, Router};
-    use log::info;
+    use log::{info, warn};
     use sqlx::FromRow;
     use std::sync::Arc;
 
     pub fn route(mc: Arc<ModelController>) -> Router {
         Router::new()
+            .route("/update", routing::patch(update))
+            .route_layer(RequireAuth::login_with_role(Role::Admin..))
             .route("/get/:title", routing::get(get))
             .route("/get", routing::get(all))
             .with_state(mc)
@@ -32,16 +34,14 @@ mod notes {
             .await
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-        let note = sqlx::query(
-            "
+        let note = sqlx::query("
             SELECT 
                 title, author, source, pub_date 
             FROM 
-                notes
+                NoteTable
             WHERE 
                 title = ? COLLATE NOCASE
-        ",
-        )
+        ")
         .bind(title)
         .fetch_one(&mut conn)
         .await
@@ -61,14 +61,12 @@ mod notes {
             .await
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-        let notes = sqlx::query(
-            "
+        let notes = sqlx::query("
             SELECT 
                 title, author, source, pub_date 
             FROM 
-                notes
-        ",
-        )
+                NoteTable
+        ")
         .fetch_all(&mut conn)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
@@ -79,5 +77,18 @@ mod notes {
                 .map(|r| Note::from_row(r).expect("Failed to map note from row"))
                 .collect::<Vec<Note>>(),
         ));
+    }
+
+    async fn update(
+        State(mc): State<Arc<ModelController>>, 
+        Json(updater): Json<Updater>
+    )  -> Result<(), StatusCode>{
+        info!("{:<12} -> notes::update", "ROUTE");
+        mc.update::<Note>(&updater).await.map_err(|x| {
+            warn!("Error occurred while updating a note: {}", x);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+        return Ok(());
     }
 }

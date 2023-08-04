@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::model::ModelController;
 use anyhow::{anyhow, Result};
 use axum::{extract::State, http::StatusCode, routing, Json, Router};
-use axum_login::{extractors::AuthContext, secrecy::SecretVec, AuthUser, SqliteStore};
+use axum_login::{extractors::AuthContext, secrecy::SecretVec, AuthUser, SqliteStore, RequireAuthorizationLayer};
 use log::{info, log_enabled, Level};
 use password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString};
 use pbkdf2::Pbkdf2;
@@ -62,7 +62,7 @@ impl User {
         let mut conn = mc.pool().acquire().await?;
         let res = sqlx::query(
             "
-            INSERT INTO users (name, password_hash, role)
+            INSERT INTO UserTable (name, password_hash, role)
             VALUES(?, ?, ?)
         ",
         )
@@ -92,7 +92,7 @@ impl User {
                 SELECT 
                     * 
                 FROM 
-                    users
+                    UserTable
                 WHERE 
                     name = ?
             ",
@@ -141,7 +141,9 @@ impl AuthUser<i64, Role> for User {
     }
 }
 
-type Auth = AuthContext<i64, User, SqliteStore<User, Role>, Role>;
+pub type Auth = AuthContext<i64, User, SqliteStore<User, Role>, Role>;
+
+pub type RequireAuth = RequireAuthorizationLayer<i64, User, Role>;
 
 pub fn routes(mc: Arc<ModelController>) -> Router {
     return Router::new()
