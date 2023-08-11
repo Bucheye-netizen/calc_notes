@@ -10,5 +10,4 @@
 
 <hr class="solid">
 
-
 {@html data.source}

@@ -32,9 +32,7 @@
   {/each}
 </table>
 
-<style lang="scss">
-  $color: #0cf;
-
+<style>
   button {
     margin-left: 10px;
     border: none; 

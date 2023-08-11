@@ -1,14 +1,14 @@
-use std::sync::Arc;
-
 use crate::model::ModelController;
 use anyhow::{anyhow, Result};
-use axum::{extract::State, http::StatusCode, routing, Json, Router};
-use axum_login::{extractors::AuthContext, secrecy::SecretVec, AuthUser, SqliteStore, RequireAuthorizationLayer};
-use log::{info, log_enabled, Level};
-use password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString};
+use axum_login::{secrecy::SecretVec, AuthUser, RequireAuthorizationLayer, extractors::AuthContext, SqliteStore};
+use password_hash::{PasswordHasher, PasswordVerifier, SaltString, PasswordHash};
 use pbkdf2::Pbkdf2;
 use rand_core::OsRng;
 use sqlx::{sqlite::SqliteRow, FromRow, Row};
+
+pub type Auth = AuthContext<i64, User, SqliteStore<User, Role>, Role>;
+
+pub type RequireAuth = RequireAuthorizationLayer<i64, User, Role>;
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub enum Role {
@@ -18,7 +18,7 @@ pub enum Role {
 }
 
 impl Role {
-    fn as_u32(&self) -> u32 {
+    pub fn as_u32(&self) -> u32 {
         match self {
             Role::User => 0,
             Role::Admin => 1,
@@ -26,7 +26,7 @@ impl Role {
         }
     }
 
-    fn from_u32(val: u32) -> Self {
+    pub fn from_u32(val: u32) -> Self {
         match val {
             0 => Role::User,
             1 => Role::Admin,
@@ -38,10 +38,10 @@ impl Role {
 
 #[derive(Debug, Clone)]
 pub struct User {
-    id: i64,
-    name: String,
+    pub id: i64,
+    pub name: String,
+    pub role: Role,
     password_hash: String,
-    role: Role,
 }
 
 impl User {
@@ -83,6 +83,8 @@ impl User {
 
     /// # Usage
     /// Query user information based on the given password and username.
+    /// If the user's password is legitimate, then the method returns
+    /// the user. Otherwise, it returns an error.
     pub async fn query(mc: &ModelController, name: &String, password: &String) -> Result<Self> {
         let mut conn = mc.pool().acquire().await?;
         // Getting user from database
@@ -139,57 +141,4 @@ impl AuthUser<i64, Role> for User {
     fn get_role(&self) -> Option<Role> {
         return Some(self.role.clone());
     }
-}
-
-pub type Auth = AuthContext<i64, User, SqliteStore<User, Role>, Role>;
-
-pub type RequireAuth = RequireAuthorizationLayer<i64, User, Role>;
-
-pub fn routes(mc: Arc<ModelController>) -> Router {
-    return Router::new()
-        .route("/login", routing::post(login))
-        .route("/logout", routing::get(logout))
-        .route("/status", routing::get(status))
-        .with_state(mc);
-}
-
-async fn login(
-    mut auth: Auth,
-    State(mc): State<Arc<ModelController>>,
-    Json((name, password)): Json<(String, String)>,
-) -> Result<(), StatusCode> {
-    info!("{:<12} -> auth::login", "ROUTE");
-    auth.login(&User::query(&mc, &name, &password).await.map_err(|x| {
-        info!("ERROR auth::login: {}", x);
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?)
-    .await
-    .map_err(|x| {
-        info!("ERROR auth::login: {}", x);
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?;
-
-    return Ok(());
-}
-
-async fn logout(mut auth: Auth) {
-    if log_enabled!(Level::Info) {
-        let string = match &auth.current_user {
-            Some(u) => &u.name,
-            None => "NONE",
-        };
-
-        info!("{:<12} -> auth::logout: {}", "ROUTE", string);
-    }
-
-    auth.logout().await;
-}
-
-async fn status(auth: Auth) -> Json<u32> {
-    info!("{:<12} -> auth::status", "ROUTE");
-
-    return Json(match auth.current_user {
-        None => u32::MAX,
-        Some(user) => user.role.as_u32(),
-    });
 }

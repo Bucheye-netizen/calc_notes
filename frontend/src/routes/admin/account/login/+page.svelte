@@ -23,7 +23,7 @@
             console.log(e);
             return false;
         }
-        goto("/");
+        goto("/admin/");
     }
 
     let valid; 

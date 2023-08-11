@@ -1,12 +1,11 @@
 use anyhow::{anyhow, Result};
 use axum::http::{HeaderName, HeaderValue};
-use lazy_static::lazy_static;
 use once_cell::sync::Lazy;
+use reqwest::Client;
 use reqwest::{
     cookie::{Cookie, CookieStore, Jar},
     Response,
 };
-use reqwest::Client;
 use serde_json::json;
 use std::env;
 use std::sync::Arc;
@@ -42,7 +41,7 @@ async fn fmt_response(response: Response) -> String {
         ));
     }
 
-    let cookies = cookie_jar().cookies(&response.url());
+    let cookies = COOKIE_JAR.cookies(&response.url());
 
     if cookies.is_some() {
         output.push_str(&format!(
@@ -68,14 +67,9 @@ async fn fmt_response(response: Response) -> String {
     output
 }
 
-lazy_static! {
-    static ref COOKIE_JAR: Arc<Jar> = Arc::new(Jar::default());
-}
-
-fn cookie_jar() -> Arc<Jar> {
-    lazy_static::initialize(&COOKIE_JAR);
-    return COOKIE_JAR.clone();
-}
+static COOKIE_JAR: Lazy<Arc<Jar>> = Lazy::new(|| {
+    Arc::new(Jar::default())
+});
 
 static BACKEND_URL: Lazy<String> = Lazy::new(|| {
     dotenvy::dotenv().ok();
@@ -86,21 +80,17 @@ static BACKEND_URL: Lazy<String> = Lazy::new(|| {
 static TEST_ADMIN: Lazy<(String, String)> = Lazy::new(|| {
     dotenvy::dotenv().ok();
     (
-        env::var("TEST_ADMIN")
-            .expect("Set the BACKEND_URL environment variable"),
-        env::var("TEST_ADMIN_PASSWORD")
-            .expect("Set TEST_ADMIN_PASSWORD the environment variable")
+        env::var("TEST_ADMIN").expect("Set the BACKEND_URL environment variable"),
+        env::var("TEST_ADMIN_PASSWORD").expect("Set TEST_ADMIN_PASSWORD the environment variable"),
     )
 });
-
-
 
 /// Tests whether the database can get notes
 #[tokio::test]
 async fn data() -> Result<()> {
     let client = Client::builder()
         .cookie_store(true)
-        .cookie_provider(cookie_jar().clone())
+        .cookie_provider(COOKIE_JAR.clone())
         .build()?;
 
     let response = client
@@ -121,7 +111,7 @@ async fn data() -> Result<()> {
 async fn auth() -> Result<()> {
     let client = Client::builder()
         .cookie_store(true)
-        .cookie_provider(cookie_jar().clone())
+        .cookie_provider(COOKIE_JAR.clone())
         .build()?;
 
     let response = client
@@ -161,14 +151,13 @@ async fn auth() -> Result<()> {
     return Ok(());
 }
 
-
-/// Checks whether updating works. 
+/// Checks whether updating works.
 /// TODO: Add check to ensure update occurred, not just that it didn't error.
 #[tokio::test]
-async fn update() -> Result<()> {
+async fn patch() -> Result<()> {
     let client = Client::builder()
         .cookie_store(true)
-        .cookie_provider(cookie_jar().clone())
+        .cookie_provider(COOKIE_JAR.clone())
         .build()?;
 
     client
@@ -178,15 +167,15 @@ async fn update() -> Result<()> {
         .await?;
 
     let response = client
-        .patch(format!("{}/data/notes/update", BACKEND_URL.as_str()))
+        .patch(format!("{}/data/notes/patch", BACKEND_URL.as_str()))
         .json(&json!(
             {
-                "set": 
+                "set":
                 {
                     "source": "Updated body",
                     "pub_date": -2000
-                }, 
-                "at": 
+                },
+                "at":
                 [
                     [["title", "=", "Test"], ""]
                 ]
@@ -200,18 +189,17 @@ async fn update() -> Result<()> {
     }
 
     println!("{}", fmt_response(response).await);
- 
 
     let response = client
-        .patch(format!("{}/data/notes/update", BACKEND_URL.as_str()))
+        .patch(format!("{}/data/notes/patch", BACKEND_URL.as_str()))
         .json(&json!(
             {
-                "set": 
+                "set":
                 {
                     "source": "<h1>Usage</h1> <p>This is almost entirely for testing purposes</p>",
                     "pub_date": 0
-                }, 
-                "at": 
+                },
+                "at":
                 [
                     [["title", "=", "Test"], ""]
                 ]
@@ -231,7 +219,7 @@ async fn update() -> Result<()> {
     }
 
     println!("{}", fmt_response(response).await);
- 
+
     client
         .get(format!("{}/auth/logout", BACKEND_URL.as_str()))
         .json(&json!([TEST_ADMIN.0, TEST_ADMIN.1]))

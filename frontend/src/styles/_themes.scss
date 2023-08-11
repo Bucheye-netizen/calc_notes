@@ -1,0 +1,25 @@
+$styles: (
+    accent-color: (
+        light: darkred
+    ),
+    border-color: (
+        light: #9c938c
+    ),
+    font-color: (
+        light: #363636
+    ),
+    background-color: (
+        // light: #FFF1E5
+        light: red
+    )
+);
+
+@mixin style($theme) {
+    @each $key, $map in $styles {
+        @each $prop, $color in $map {
+            @if $prop == $theme {
+                --#{key}: #{color};
+            }
+        }
+    }
+}
